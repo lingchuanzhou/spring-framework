@@ -39,7 +39,7 @@ import org.springframework.util.StringUtils;
  * <p>Will return a {@link UrlResource} if the location value is a URL,
  * and a {@link ClassPathResource} if it is a non-URL path or a
  * "classpath:" pseudo-URL.
- *
+ *	与 DefaultResource 相似，org.springframework.core.io.DefaultResourceLoader 是 ResourceLoader 的默认实现。
  * @author Juergen Hoeller
  * @since 10.03.2004
  * @see FileSystemResourceLoader
@@ -140,10 +140,20 @@ public class DefaultResourceLoader implements ResourceLoader {
 	}
 
 
+	/**
+	 * ResourceLoader 中最核心的方法为 #getResource(String location) ，
+	 * 它根据提供的 location 返回相应的 Resource 。
+	 * 而 DefaultResourceLoader 对该方法提供了核心实现
+	 * （因为，它的两个子类都没有提供覆盖该方法，
+	 * 所以可以断定 ResourceLoader 的资源加载策略就封装在
+	 * DefaultResourceLoader 中)，代码如下：
+	 * @param location the resource location
+	 * @return
+	 */
 	@Override
 	public Resource getResource(String location) {
 		Assert.notNull(location, "Location must not be null");
-
+		// 首先，通过 ProtocolResolver 来加载资源，ProtocolResolver为DefaultResourceLoader 的 SPI
 		for (ProtocolResolver protocolResolver : this.protocolResolvers) {
 			Resource resource = protocolResolver.resolve(location, this);
 			if (resource != null) {
@@ -152,19 +162,25 @@ public class DefaultResourceLoader implements ResourceLoader {
 		}
 
 		if (location.startsWith("/")) {
+			// 其次，以 / 开头，返回 ClassPathContextResource 类型的资源
 			return getResourceByPath(location);
 		}
+		//非classpath:前缀开头，才有可能被子类的getResourceByPath处理
 		else if (location.startsWith(CLASSPATH_URL_PREFIX)) {
+			// 再次，以 classpath: 开头，返回 ClassPathResource 类型的资源
 			return new ClassPathResource(location.substring(CLASSPATH_URL_PREFIX.length()), getClassLoader());
 		}
 		else {
 			try {
 				// Try to parse the location as a URL...
+				//构造 URL ，尝试通过它进行资源定位，若没有抛出 MalformedURLException 异常，
+				// 则判断是否为 FileURL , 如果是则构造 FileUrlResource 类型的资源，否则构造 UrlResource 类型的资源。
 				URL url = new URL(location);
 				return (ResourceUtils.isFileURL(url) ? new FileUrlResource(url) : new UrlResource(url));
 			}
 			catch (MalformedURLException ex) {
 				// No URL -> resolve as resource path.
+				// 最后，返回 ClassPathContextResource 类型的资源
 				return getResourceByPath(location);
 			}
 		}
@@ -209,3 +225,34 @@ public class DefaultResourceLoader implements ResourceLoader {
 	}
 
 }
+/**
+ * 下面示例是演示 DefaultResourceLoader 加载资源的具体策略，代码如下（该示例参考《Spring 揭秘》 P89）：
+ * ==========================================================================================================
+ * ResourceLoader resourceLoader = new DefaultResourceLoader();
+ *
+ * Resource fileResource1 = resourceLoader.getResource("D:/Users/chenming673/Documents/spark.txt");
+ * System.out.println("fileResource1 is FileSystemResource:" + (fileResource1 instanceof FileSystemResource));
+ *
+ * Resource fileResource2 = resourceLoader.getResource("/Users/chenming673/Documents/spark.txt");
+ * System.out.println("fileResource2 is ClassPathResource:" + (fileResource2 instanceof ClassPathResource));
+ *
+ * Resource urlResource1 = resourceLoader.getResource("file:/Users/chenming673/Documents/spark.txt");
+ * System.out.println("urlResource1 is UrlResource:" + (urlResource1 instanceof UrlResource));
+ *
+ * Resource urlResource2 = resourceLoader.getResource("http://www.baidu.com");
+ * System.out.println("urlResource1 is urlResource:" + (urlResource2 instanceof  UrlResource));
+ * ==========================================================================================================
+ * 运行结果：
+ * fileResource1 is FileSystemResource:false
+ * fileResource2 is ClassPathResource:true
+ * urlResource1 is UrlResource:true
+ * urlResource1 is urlResource:true
+ *
+ * 其实对于 fileResource1 ，我们更加希望是 FileSystemResource 资源类型。
+ * 但是，事与愿违，它是 ClassPathResource 类型。为什么呢？
+ * 在 DefaultResourceLoader#getResource() 方法的资源加载策略中，
+ * 我们知道 "D:/Users/chenming673/Documents/spark.txt" 地址，
+ * 其实在该方法中没有相应的资源类型，那么它就会在抛出 MalformedURLException 异常时，
+ * 通过 DefaultResourceLoader#getResourceByPath(...) 方法，构造一个 ClassPathResource 类型的资源。
+ * 可以将 DefaultResourceLoader 改为 FileSystemContextResource ，则 fileResource1 则为 FileSystemResource 类型的资源。
+ **/

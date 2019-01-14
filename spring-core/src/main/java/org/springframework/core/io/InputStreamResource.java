@@ -33,7 +33,7 @@ import org.springframework.util.Assert;
  * {@link #isOpen()}. Do not use an {@code InputStreamResource} if you need to
  * keep the resource descriptor somewhere, or if you need to read from a stream
  * multiple times.
- *
+ * 将给定的 InputStream 作为一种资源的 Resource 的实现类。
  * @author Juergen Hoeller
  * @author Sam Brannen
  * @since 28.12.2003

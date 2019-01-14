@@ -32,6 +32,8 @@ import org.springframework.util.Assert;
  * without having to resort to a single-use {@link InputStreamResource}.
  * Particularly useful for creating mail attachments from local content,
  * where JavaMail needs to be able to read the stream multiple times.
+ * 对字节数组提供的数据的封装。如果通过 InputStream 形式访问该类型的资源，
+ * 该实现会根据字节数组的数据构造一个相应的 ByteArrayInputStream。
  *
  * @author Juergen Hoeller
  * @author Sam Brannen
